@@ -3,49 +3,106 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Coal separation: how each machine works</title>
 <style>
-:root{--ink:#1d2430;--dim:#5b6573;--line:#d9dde3;--accent:#c4552d;--bg:#f4f2ed}
+:root{--graphite:#22282B;--deep:#181D1F;--steel:#51707E;--steel-l:#AABBC2;--ore:#C1602C;--ore-d:#9C4A1F;--paper:#F7F7F5;--line:#D8DBDA;--ink:#20262A;--muted:#5B6469;--on-dark:#F3F1EC}
+@media (prefers-color-scheme:dark){:root{--paper:#15181A;--ink:#EDEEEE;--muted:#9AA3A6;--line:#33393C}}
 *{box-sizing:border-box}
-body{margin:0;font-family:Bierstadt,"Segoe UI",system-ui,Arial,sans-serif;color:var(--ink);background:#fff}
-.wrap{max-width:1040px;margin:0 auto;padding:18px 16px 40px}
-h1{font-size:22px;margin:0 0 4px}
-.sub{color:var(--dim);font-size:14px;margin:0 0 14px}
-.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-.tabs button{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 12px;border-radius:8px;font-size:14px;cursor:pointer}
-.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-canvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
-.ctl{display:flex;flex-wrap:wrap;gap:14px 24px;margin:12px 0;align-items:center}
-.ctl label{font-size:14px;display:flex;flex-direction:column;gap:3px;min-width:200px}
-.ctl input[type=range]{width:220px}
-.ctl button,.ctl select{padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:14px;cursor:pointer}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:760px){.cols{grid-template-columns:1fr}}
-.card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff}
-.card h3{margin:0 0 6px;font-size:15px}
-.card p{font-size:14px;line-height:1.5;margin:4px 0}
-.src{font-size:12px;font-style:italic;color:var(--dim);margin-top:8px}
-.tag{display:inline-block;font-size:12px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Calibri,"Segoe UI",Arial,sans-serif;display:flex;flex-direction:column;align-items:center;padding:28px 18px 40px}
+h1{font-family:Cambria,Georgia,serif;font-size:26px;margin:0 0 4px;text-align:center}
+.subtitle{color:var(--muted);font-size:14px;margin-bottom:18px;text-align:center;max-width:680px}
+.wrap{width:100%;max-width:980px;display:flex;flex-direction:column;gap:18px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.tabs button{border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px 14px;border-radius:20px;font:inherit;font-size:13.5px;cursor:pointer}
+.tabs button.on{background:var(--graphite);color:var(--on-dark);border-color:var(--graphite)}
+@media (prefers-color-scheme:dark){.tabs button.on{background:var(--ore);border-color:var(--ore)}}
+.panel{background:var(--deep);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:16px}
+canvas{width:100%;height:auto;display:block;background:#0f1213;border-radius:10px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:20px 28px;color:var(--on-dark)}
+@media(max-width:760px){.controls{grid-template-columns:1fr}}
+.badge{display:inline-block;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;color:var(--on-dark);background:var(--steel)}
+.sw{background:var(--ore);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;margin-bottom:12px}
+#ctl{display:flex;flex-direction:column;gap:12px}
+#ctl label{display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+#ctl label.mainctl{font-size:15px}
+#ctl input[type=range]{width:100%;accent-color:var(--ore);height:4px}
+#ctl select,#ctl .go{background:#2b3236;color:var(--on-dark);border:1px solid #3d474c;border-radius:8px;padding:7px 10px;font:inherit;font-size:13.5px;cursor:pointer}
+.scale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--steel-l)}
+.desc{font-size:14px;line-height:1.5;color:#CBD3D5;min-height:92px;margin:4px 0 12px}
+.legend{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.legend div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 6px;text-align:center;font-size:10.5px;color:var(--steel-l);transition:all .15s}
+.legend div.active{border-color:var(--ore);color:var(--on-dark);background:rgba(193,96,44,.15)}
+.legend b{display:block;font-size:12px;color:var(--on-dark);margin-bottom:2px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.cards{grid-template-columns:1fr}}
+.note{font-size:13px;color:var(--muted);background:rgba(128,128,128,.07);border:1px solid var(--line);border-radius:10px;padding:12px 16px;line-height:1.5}
+.note b{color:var(--ore-d)}.note p{margin:4px 0}
+@media (prefers-color-scheme:dark){.note b{color:#E8985F}}
+footer{font-size:11.5px;color:var(--muted);margin-top:4px;text-align:center;font-style:italic}
 </style></head><body>
+<h1>How the Coal Separation Machines Work</h1>
+<div class="subtitle">Pick a machine, then drag the main slider and watch the regime change.</div>
 <div class="wrap">
-<h1>How the coal separation machines actually work</h1>
-<p class="sub">Simplified 2D sketches for teaching, not DEM or CFD. Each tab shows the machine layout and the force that does the separating. Thesis numbers are shown as reported, never computed by the animation.</p>
 <div class="tabs" id="tabs"></div>
+<div class="panel">
 <canvas id="cv" width="960" height="540"></canvas>
-<div class="ctl" id="ctl"></div>
-<div class="cols">
-<div class="card"><h3>What you are seeing</h3><div id="see"></div></div>
-<div class="card"><h3>For high-ash coal tailings</h3><div id="tail"></div></div>
+<div class="controls">
+<div><div class="badge" id="badge">-</div><div class="desc" id="desc"></div><div class="legend" id="legend"></div></div>
+<div><button class="sw" id="sw">Pause sweep</button><div id="ctl"></div></div>
+</div></div>
+<div class="cards">
+<div class="note"><b>What you are seeing</b><div id="see"></div></div>
+<div class="note"><b>For high-ash coal tailings</b><div id="tail"></div></div>
 </div>
-<div class="src" id="src"></div>
+<div class="note"><b>Note on accuracy:</b> every animation is a simplified 2D sketch built to show the direction and cause of each effect. It is not a DEM or CFD simulation and its numbers are not plant data.</div>
 </div>
+<footer id="src"></footer>
 <script>const W=960,H=540,cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 function mul(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-const COAL='#1c1c22',ASH='#c69a5b',WATER='#dcebf5',INK='#1d2430',DIM='#5b6573',WARN='#b0431f',OK='#2f7d32';
-function txt(s,x,y,o={}){ctx.save();ctx.font=(o.b?'bold ':'')+(o.s||14)+'px Segoe UI,Arial,sans-serif';ctx.fillStyle=o.c||INK;ctx.textAlign=o.a||'left';ctx.fillText(s,x,y);ctx.restore()}
+const COAL='#0c0e10',ASH='#e3a65a',WATER='#35505f',INK='#e8ebec',DIM='#9fabb0',WARN='#ff9a6b',OK='#6fd0a0';
+function txt(s,x,y,o={}){ctx.save();ctx.font=(o.b?'bold ':'')+(o.s||14)+'px Calibri,Segoe UI,Arial,sans-serif';ctx.fillStyle=o.c||INK;ctx.textAlign=o.a||'left';ctx.fillText(s,x,y);ctx.restore()}
 function rr(x,y,w,h,r,f,s){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(f){ctx.fillStyle=f;ctx.fill()}if(s){ctx.strokeStyle=s;ctx.lineWidth=1.5;ctx.stroke()}}
-function dot(x,y,r,c,a=1){ctx.globalAlpha=a;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=c;ctx.fill();ctx.globalAlpha=1}
+function dot(x,y,r,c,a=1){ctx.globalAlpha=a;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=c;ctx.fill();if(c===COAL){ctx.strokeStyle='rgba(190,205,212,.45)';ctx.lineWidth=.8;ctx.stroke()}ctx.globalAlpha=1}
 function arrow(x1,y1,x2,y2,c=INK){ctx.save();ctx.strokeStyle=c;ctx.fillStyle=c;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();const a=Math.atan2(y2-y1,x2-x1);ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-9*Math.cos(a-.4),y2-9*Math.sin(a-.4));ctx.lineTo(x2-9*Math.cos(a+.4),y2-9*Math.sin(a+.4));ctx.fill();ctx.restore()}
 function legend(x,y,items){items.forEach((it,i)=>{dot(x+6,y+i*20-4,6,it[0]);txt(it[1],x+18,y+i*20,{s:13})})}
 function collide(P,it){for(let k=0;k<it;k++)for(let i=0;i<P.length;i++){const a=P[i];for(let j=i+1;j<P.length;j++){const b=P[j];const dx=b.x-a.x,dy=b.y-a.y,m=a.d+b.d;if(Math.abs(dx)<m&&Math.abs(dy)<m){const dd=Math.hypot(dx,dy)||.01;if(dd<m){const o=(m-dd)/2/dd;a.x-=dx*o;a.y-=dy*o;b.x+=dx*o;b.y+=dy*o}}}}}
+</script>
+<script>const REG={
+S1:{main:'sol',scale:['Free settling','Hindered','Crowded'],br:[10,25],unit:'% solids',
+ it:[
+ {k:'Free settling',c:'#51707E',s:'Each grain falls alone',t:'In a thin slurry every grain falls on its own. Dense ash outruns coal, so a clean split appears quickly. This is the textbook picture of gravity separation.'},
+ {k:'Hindered settling',c:'#2F8F83',s:'Crowding slows the fall',t:'The slurry now acts like a heavier fluid and the grains crowd each other. Everything slows, ash more than coal, but the density gap still separates them. This is where real tanks operate.'},
+ {k:'Crowded',c:'#B23A3A',s:'Separation collapses',t:'Very thick slurry: hindrance is so strong that both coal and ash barely move, and the suspension density approaches that of coal. Throughput looks high but the split is poor.'}]},
+S2:{main:'rho',scale:['Too light','Sharp cut','Too heavy'],br:[1.42,1.62],unit:'rel. density',
+ it:[
+ {k:'Medium too light',c:'#51707E',s:'Coal sinks with the shale',t:'The bath is lighter than most of the coal, so even clean coal sinks into the reject. The product is very clean but the yield collapses.'},
+ {k:'Sharp cut',c:'#2F8F83',s:'Coal floats, shale sinks',t:'The medium sits between coal and shale. Light coal floats to the launder, dense shale sinks to the scraper. Grains close to the medium density hang about and are the ones misplaced.'},
+ {k:'Medium too heavy',c:'#B23A3A',s:'Middlings float with coal',t:'The bath is heavier than the middlings, so high-ash particles float into the clean coal. Yield looks good, but the product ash climbs.'}]},
+S3:{main:'amp',scale:['Weak pulse','Stratifying','Over-pulsed'],br:[220,480],unit:'pulse',
+ it:[
+ {k:'Weak pulse',c:'#51707E',s:'Bed barely opens',t:'The water stroke is too small to open the bed, so coal and shale stay mixed on the screen. Little stratification happens.'},
+ {k:'Stratifying',c:'#2F8F83',s:'Coal rises, shale sinks',t:'On the up stroke the bed opens and light coal lifts more. On the down stroke the bed closes and dense shale slips toward the bottom. Layers build over many pulses.'},
+ {k:'Over-pulsed',c:'#B23A3A',s:'Bed blown apart',t:'The stroke throws the whole bed up and mixes it. Layers rebuild only briefly each cycle, so separation is poor and fine shale is carried up.'}]},
+S4:{main:'P',scale:['Weak vortex','Classifying','Strong vortex'],br:[.8,1.5],unit:'inlet pressure',
+ it:[
+ {k:'Weak vortex',c:'#51707E',s:'Coarse and dense leak',t:'The spin is gentle, so coarse and dense grains drift through the overflow. The cut is coarse and untidy.'},
+ {k:'Classifying',c:'#2F8F83',s:'Dense out low, light out top',t:'Spin throws coarse, dense grains to the wall and down to the underflow. Light and fine grains follow the inner vortex up to the overflow. A cyclone sorts by size and density together.'},
+ {k:'Strong vortex',c:'#B23A3A',s:'Finer cut, more energy',t:'Higher pressure gives a finer cut size and more spin, but costs energy and wear, and fine ash can still be dragged out in the underflow with the water split.'}]},
+S5:{main:'air',scale:['Starved','Selective froth','Over-aerated'],br:[.5,.85],unit:'air',
+ it:[
+ {k:'Air starved',c:'#51707E',s:'Few bubbles to carry coal',t:'Too few bubbles means little carrying capacity. Coal that is hydrophobic stays in the cell and recovery falls.'},
+ {k:'Selective froth',c:'#2F8F83',s:'Coal on bubbles, ash stays',t:'Water-repelling coal attaches to bubbles and rises to the froth. Hydrophilic ash stays in the pulp and leaves as tailings.'},
+ {k:'Over-aerated',c:'#B23A3A',s:'Ash dragged into froth',t:'Too much air makes a violent, wet froth that drags water and fine ash up with it (entrainment). Recovery is high but the froth gets dirtier.'}]},
+S6:{main:'rpm',scale:['Slow','Layering','High g'],br:[4000,9000],unit:'rpm',
+ it:[
+ {k:'Weak field',c:'#51707E',s:'Fine ash settles slowly',t:'At low speed the field is only a few thousand times gravity or less, and fine ash settles slowly. The sample stays mixed for a long time.'},
+ {k:'Layering',c:'#2F8F83',s:'Dense layer builds at the wall',t:'Spin multiplies gravity. Dense ash is thrown outward first and packs against the wall, while light coal stays inward. The layers sharpen with time.'},
+ {k:'High g',c:'#B23A3A',s:'Compact sediment',t:'Very high speed packs the dense layer tightly and fast. This is why a centrifuge can handle fine tailings that plain gravity cannot, at a power and wear cost.'}]},
+S7:{main:'sz',scale:['Mostly freed','Partly freed','Locked'],br:[50,100],unit:'micrometres',rev:true,
+ it:[
+ {k:'Mostly freed',c:'#2F8F83',s:'Clean coal and free ash appear',t:'Pieces are now small enough that a good share are either clean coal or free ash. A separator can finally treat them differently. Very fine grains, however, are hard for gravity and flotation to handle.'},
+ {k:'Partly freed',c:'#C1602C',s:'Mixed grains remain',t:'Many grains still carry both coal and ash. Separation here gives middlings: some ash goes with coal, some coal goes with ash.'},
+ {k:'Locked',c:'#B23A3A',s:'Ash intergrown with coal',t:'The pieces are coarse, so ash is still locked inside coal. No separator can split what is physically one particle. Grinding is the only way to free it.'}]}
+};
+function regFor(key,v){const R=REG[key],b=R.br;let i;if(R.rev)i=v<=b[0]?0:v<=b[1]?1:2;else i=v<b[0]?0:v<b[1]?1:2;return R.it[i]}
 </script>
 <script>/* 1 Settling column */
 const S1={name:'Gravity: settling column',
@@ -53,11 +110,11 @@ const S1={name:'Gravity: settling column',
  see:'<p>A column of water with fine coal (black, light) and ash minerals (tan, dense), all starting mixed. Dense ash falls faster. As the suspension thickens, its own density rises, so coal sinks more slowly or even floats, but every particle also gets crowded and slows down.</p>',
  tail:'<p>Plain gravity separation depends on density contrast, and fine particles settle very slowly. In a thick slurry, crowding hinders movement. Fine tailings need a stronger field than 1 g, which is what the centrifuge tab shows.</p>',
  src:'Subba Rao &amp; Gouricharan (2016), ch. 22; Wills &amp; Finch (2015), ch. 10; Richardson &amp; Zaki (1954). Simplified: effective medium density and (1-phi)^4.65 hindrance.',
- init(p){this.R=mul(11);const phi=p.sol/100;this.phi=phi;const n=Math.round(50+p.sol*6);this.ps=[];this.top=90;this.bot=470;this.x0=330;this.x1=630;
+ init(p){this.R=mul(11);const phi=p.sol/100;this.phi=phi;const n=260;this.ps=[];this.top=90;this.bot=470;this.x0=330;this.x1=630;
   for(let i=0;i<n;i++){const ash=this.R()<.42;this.ps.push({x:this.x0+8+this.R()*(this.x1-this.x0-16),y:this.top+this.R()*(this.bot-this.top-30),ash,d:ash?3+this.R()*3.5:5+this.R()*4.5,rho:ash?2.6:1.4,rest:false})}
   this.rs=1+phi;this.bed=new Array(50).fill(this.bot);this.tb=new Array(50).fill(this.top);this.t=0},
  vel(d,rho){return 2.2*d*d*(rho-this.rs)*Math.pow(1-this.phi,4.65)},
- step(dt){this.t+=dt;const bw=(this.x1-this.x0)/50;for(const q of this.ps){if(q.rest)continue;q.y+=this.vel(q.d,q.rho)*dt;q.x+=(this.R()-.5)*30*dt;q.x=Math.max(this.x0+q.d,Math.min(this.x1-q.d,q.x));
+ step(dt){this.t+=dt;this.phi=this.p.sol/100;this.rs=1+this.phi;const bw=(this.x1-this.x0)/50;for(const q of this.ps){if(q.rest)continue;q.y+=this.vel(q.d,q.rho)*dt;q.x+=(this.R()-.5)*30*dt;q.x=Math.max(this.x0+q.d,Math.min(this.x1-q.d,q.x));
    const b=Math.max(0,Math.min(49,((q.x-this.x0)/bw)|0));
    if(q.y>this.bed[b]-q.d){q.y=this.bed[b]-q.d;this.bed[b]-=q.d*1.1;q.rest=true}
    if(q.y<this.tb[b]+q.d){q.y=this.tb[b]+q.d;this.tb[b]+=q.d*1.1;q.rest=true}}},
@@ -85,10 +142,10 @@ const S2={name:'Heavy medium separation',
    if(q.y<L.top+q.d)q.y=L.top+q.d;if(q.y>L.bot-q.d)q.y=L.bot-q.d;
    if(q.x>L.r){q.out=true;if(q.y<(L.top+L.bot)/2)this.fl[q.type]++;else this.sk[q.type]++}}
   this.ps=this.ps.filter(q=>!q.out)},
- draw(){const L=this.L;rr(L.l,L.top,L.r-L.l,L.bot-L.top,6,'#e6e1d8','#9b8f7c');
+ draw(){const L=this.L;rr(L.l,L.top,L.r-L.l,L.bot-L.top,6,'#3a5568','#6f8ea0');
   const g=ctx.createLinearGradient(0,L.top,0,L.bot);g.addColorStop(0,'rgba(120,120,130,.12)');g.addColorStop(1,'rgba(40,40,50,.28)');ctx.fillStyle=g;ctx.fillRect(L.l+1,L.top+1,L.r-L.l-2,L.bot-L.top-2);
   for(const q of this.ps)dot(q.x,q.y,q.d,q.type==0?COAL:q.type==1?'#6b6258':ASH);
-  ctx.fillStyle='#8a8f98';ctx.fillRect(L.l,L.bot+2,L.r-L.l,6);for(let i=0;i<14;i++){const x=L.l+((i*50+this.t*30)%(L.r-L.l));dot(x,L.bot+5,2.5,'#fff')}
+  ctx.fillStyle='#7b8a91';ctx.fillRect(L.l,L.bot+2,L.r-L.l,6);for(let i=0;i<14;i++){const x=L.l+((i*50+this.t*30)%(L.r-L.l));dot(x,L.bot+5,2.5,'#1b2327')}
   txt('Heavy medium bath (magnetite + water), relative density '+this.m.toFixed(2),L.l,L.top-34,{b:1,s:15});
   arrow(L.l-20,110,L.l+30,135,DIM);txt('feed',L.l-48,104,{s:13,c:DIM});
   txt('FLOAT = clean coal',L.r-150,L.top-8,{b:1,s:13});txt('SINK = shale',L.r-110,L.bot+48,{b:1,s:13});
@@ -108,10 +165,10 @@ const S3={name:'Jigging',
  step(dt){this.t+=dt;const u=this.u();const P=this.ps;
   for(const q of P){const vs=26*Math.sqrt(q.d)*Math.sqrt(q.rho-1);let vy;if(u>0)vy=vs-u*.9;else vy=vs*.32*(q.ash?2.4:.6);q.y+=vy*dt;q.x+=(this.R()-.5)*20*dt}
   collide(P,2);for(const q of P){q.x=Math.max(this.x0+q.d,Math.min(this.x1-q.d,q.x));if(q.y>this.bot-q.d)q.y=this.bot-q.d;if(q.y<this.top+q.d)q.y=this.top+q.d}},
- draw(){const u=this.u();rr(this.x0-20,this.top-20,this.x1-this.x0+40,this.bot-this.top+80,6,'#fff','#7a8594');ctx.fillStyle=WATER;ctx.fillRect(this.x0-18,this.top-18,this.x1-this.x0+36,this.bot-this.top+18);
-  ctx.fillStyle='#8a8f98';ctx.fillRect(this.x0-18,this.bot,this.x1-this.x0+36,5);for(let x=this.x0;x<this.x1;x+=14){ctx.fillStyle='#fff';ctx.fillRect(x,this.bot,6,5)}
+ draw(){const u=this.u();rr(this.x0-20,this.top-20,this.x1-this.x0+40,this.bot-this.top+80,6,'#1b2327','#6f8ea0');ctx.fillStyle=WATER;ctx.fillRect(this.x0-18,this.top-18,this.x1-this.x0+36,this.bot-this.top+18);
+  ctx.fillStyle='#7b8a91';ctx.fillRect(this.x0-18,this.bot,this.x1-this.x0+36,5);for(let x=this.x0;x<this.x1;x+=14){ctx.fillStyle='#1b2327';ctx.fillRect(x,this.bot,6,5)}
   for(const q of this.ps)dot(q.x,q.y,q.d,q.ash?ASH:COAL);
-  const lift=Math.min(1,u/Math.max(1,this.p.amp))*14;rr(this.x0+140,this.bot+44-lift,this.x1-this.x0-280,10,3,'#4b5563');txt('diaphragm',this.x0+170,this.bot+78,{s:12,c:DIM});
+  const lift=Math.min(1,u/Math.max(1,this.p.amp))*14;rr(this.x0+140,this.bot+44-lift,this.x1-this.x0-280,10,3,'#8fa2ab');txt('diaphragm',this.x0+170,this.bot+78,{s:12,c:DIM});
   if(u>0)arrow(this.x1+50,this.bot+30,this.x1+50,this.bot-40,'#2b6cb0');txt(u>0?'water pushed up: bed opens':'suction: bed closes, shale trickles down',this.x0-20,this.top-36,{b:1,s:14});
   const A=this.ps.filter(q=>q.ash),C=this.ps.filter(q=>!q.ash);const sep=A.reduce((s,q)=>s+q.y,0)/A.length-C.reduce((s,q)=>s+q.y,0)/C.length;
   txt('Layering: coal sits '+Math.round(sep)+' px above shale on average',this.x0-20,this.bot+104,{s:13,b:1,c:sep>35?OK:WARN});
@@ -131,8 +188,8 @@ const S4={name:'Hydrocyclone',
    if(q.r>.42)q.z+=.20*dt*(1+.2*P);else q.z-=.42*dt*(1+.2*P);
    if(q.z<.02&&q.r<.32)q.out='o';else if(q.z<.02)q.z=.02;if(q.z>1)q.out='u'}
   for(const q of this.ps)if(q.out){(q.out=='o'?this.ov:this.un)[q.ash?1:0]++}this.ps=this.ps.filter(q=>!q.out)},
- draw(){const cx=this.cx,yt=this.yt,yb=this.yb,Rc=this.Rc;ctx.strokeStyle='#5b6573';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(cx-Rc,yt);ctx.lineTo(cx-Rc,yt+.32*this.L);ctx.lineTo(cx-14,yb);ctx.lineTo(cx+14,yb);ctx.lineTo(cx+Rc,yt+.32*this.L);ctx.lineTo(cx+Rc,yt);ctx.closePath();ctx.fillStyle=WATER;ctx.fill();ctx.stroke();
-  rr(cx-28,yt-50,56,110,4,'#eef3f6','#5b6573');arrow(cx-Rc-80,yt+14,cx-Rc-4,yt+14,DIM);txt('feed enters sideways',cx-Rc-215,yt+8,{s:13,c:DIM});
+ draw(){const cx=this.cx,yt=this.yt,yb=this.yb,Rc=this.Rc;ctx.strokeStyle='#8fa2ab';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(cx-Rc,yt);ctx.lineTo(cx-Rc,yt+.32*this.L);ctx.lineTo(cx-14,yb);ctx.lineTo(cx+14,yb);ctx.lineTo(cx+Rc,yt+.32*this.L);ctx.lineTo(cx+Rc,yt);ctx.closePath();ctx.fillStyle=WATER;ctx.fill();ctx.stroke();
+  rr(cx-28,yt-50,56,110,4,'#2d3b43','#8fa2ab');arrow(cx-Rc-80,yt+14,cx-Rc-4,yt+14,DIM);txt('feed enters sideways',cx-Rc-215,yt+8,{s:13,c:DIM});
   const pts=this.ps.map(q=>{const R=this.Rz(q.z);return{x:cx+q.r*R*Math.sin(q.th),y:yt+q.z*this.L,dep:Math.cos(q.th),q}}).sort((a,b)=>a.dep-b.dep);
   for(const o of pts)dot(o.x,o.y,2+o.q.d*3.6,o.q.ash?ASH:COAL,o.dep>0?.35:1);
   arrow(cx,yt-62,cx,yt-96,DIM);txt('OVERFLOW: fine, light',cx+10,yt-78,{b:1,s:13});arrow(cx,yb+4,cx,yb+36,DIM);txt('UNDERFLOW: coarse, dense',cx+14,yb+30,{b:1,s:13});
@@ -158,11 +215,11 @@ const S5={name:'Froth flotation',
   for(const b of this.bs)if(b.x>this.cx1+60)b.dead=true;
   for(const q of this.ps)if(q.b&&q.b.dead){this.cn[q.ash?1:0]++;q.gone=true}
   this.ps=this.ps.filter(q=>!q.gone);this.bs=this.bs.filter(b=>!b.dead);while(this.ps.length<60)this.addp(false)},
- draw(){rr(this.cx0,this.yw,this.cx1-this.cx0,this.yb-this.yw,4,WATER,'#7fa3bd');ctx.fillStyle='#eef3f6';ctx.fillRect(this.cx0,this.yw-34,this.cx1-this.cx0,34);ctx.strokeStyle='#7fa3bd';ctx.strokeRect(this.cx0,this.yw-34,this.cx1-this.cx0,34);rr(this.cx1,this.yw-50,70,50,3,'#eef3f6','#7fa3bd');txt('launder',this.cx1+6,this.yw-54,{s:12,c:DIM});
+ draw(){rr(this.cx0,this.yw,this.cx1-this.cx0,this.yb-this.yw,4,WATER,'#7fa3bd');ctx.fillStyle='#2d3b43';ctx.fillRect(this.cx0,this.yw-34,this.cx1-this.cx0,34);ctx.strokeStyle='#7fa3bd';ctx.strokeRect(this.cx0,this.yw-34,this.cx1-this.cx0,34);rr(this.cx1,this.yw-50,70,50,3,'#2d3b43','#7fa3bd');txt('launder',this.cx1+6,this.yw-54,{s:12,c:DIM});
   for(const q of this.ps)if(!q.b)dot(q.x,q.y,q.ash?3.6:3.8,q.ash?ASH:COAL);
   for(const b of this.bs){ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.strokeStyle='rgba(60,100,150,.9)';ctx.lineWidth=1.5;ctx.fillStyle='rgba(255,255,255,.55)';ctx.fill();ctx.stroke()}
   for(const q of this.ps)if(q.b)dot(q.x,q.y,q.ash?3.6:3.8,q.ash?ASH:COAL);
-  ctx.fillStyle='#4b5563';ctx.fillRect(445,this.yw-60,10,this.yb-this.yw-20+60);ctx.save();ctx.translate(450,this.yb-18);ctx.rotate(this.t*8);ctx.fillRect(-34,-4,68,8);ctx.rotate(Math.PI/2);ctx.fillRect(-34,-4,68,8);ctx.restore();
+  ctx.fillStyle='#8fa2ab';ctx.fillRect(445,this.yw-60,10,this.yb-this.yw-20+60);ctx.save();ctx.translate(450,this.yb-18);ctx.rotate(this.t*8);ctx.fillRect(-34,-4,68,8);ctx.rotate(Math.PI/2);ctx.fillRect(-34,-4,68,8);ctx.restore();
   txt('Flotation cell (side view)',this.cx0,this.yw-72,{b:1,s:15});txt('froth',this.cx0+6,this.yw-14,{s:12,c:DIM});txt('impeller',470,this.yb+16,{s:12,c:DIM});
   const c=this.cn,t=c[0]+c[1];txt('Concentrate so far: '+t+' particles, '+(t?Math.round(100*c[1]/t):0)+'% ash',690,250,{s:14,b:1});txt('(counts, not mass; illustrative)',690,270,{s:12,c:DIM});
   if(+this.p.size<45)txt('Ultrafine: weak attachment, more entrainment',690,300,{s:13,c:WARN,b:1});
@@ -187,21 +244,21 @@ const S6={name:'Centrifugal (tube and decanter)',
    for(const q of this.ps){if(q.st==0){q.x+=44*dt;q.y+=2.7*G*G*q.d*q.d*(q.ash?1.8:.6)*dt;if(q.y>=this.wy+28){q.y=this.wy+28;q.st=1}else if(q.x>this.wl)q.out='lost'}else{q.x-=60*dt;if(q.x<this.ax+10)q.out='cap'}}
    for(const q of this.ps){if(q.out=='cap')this.cap++;else if(q.out=='lost')this.lost++}this.ps=this.ps.filter(q=>!q.out)}},
  draw(){const p=this.p;
-  if(this.mode=='tube'){const x0=this.x0,x1=this.x1,t0=this.top,b=this.bot;rr(x0-6,t0-6,x1-x0+12,b-t0+12,14,'#fff','#7a8594');ctx.fillStyle=WATER;ctx.fillRect(x0,t0,x1-x0,b-t0-6);
+  if(this.mode=='tube'){const x0=this.x0,x1=this.x1,t0=this.top,b=this.bot;rr(x0-6,t0-6,x1-x0+12,b-t0+12,14,'#1b2327','#6f8ea0');ctx.fillStyle=WATER;ctx.fillRect(x0,t0,x1-x0,b-t0-6);
    for(const q of this.ps)dot(q.x,q.y,q.d,q.ash?ASH:COAL);
    const clock=Math.min(180,this.t*16);txt('Lab tube centrifuge',x0-230,70,{b:1,s:15});txt('centrifugal force acts downwards',x0+110,330,{s:13,c:DIM});arrow(x0+150,340,x0+150,390,DIM);
    txt('Spin time '+Math.floor(clock/60)+':'+String(Math.floor(clock%60)).padStart(2,'0')+' (shown 16x faster)',x0+110,100,{s:13});txt('Speed '+p.rpm+' rpm, extra water '+p.dil+'%',x0+110,120,{s:13});
    const ash=this.ps.filter(q=>q.ash),coal=this.ps.filter(q=>!q.ash);const my=a=>a.reduce((s,q)=>s+q.y,0)/a.length;const gap=my(ash)-my(coal);
    txt('Ash sits on average '+Math.round(gap)+' px below coal',x0+110,150,{s:13,b:1,c:gap>90?OK:WARN});
-   ctx.save();ctx.translate(200,400);ctx.rotate(this.t*(+p.rpm/1000)*1.4);ctx.strokeStyle='#4b5563';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-60,0);ctx.lineTo(60,0);ctx.stroke();rr(-72,-9,22,18,3,'#9aa6b2');rr(50,-9,22,18,3,'#9aa6b2');ctx.restore();txt('rotor (top view)',150,480,{s:12,c:DIM});
+   ctx.save();ctx.translate(200,400);ctx.rotate(this.t*(+p.rpm/1000)*1.4);ctx.strokeStyle='#8fa2ab';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-60,0);ctx.lineTo(60,0);ctx.stroke();rr(-72,-9,22,18,3,'#9aa6b2');rr(50,-9,22,18,3,'#9aa6b2');ctx.restore();txt('rotor (top view)',150,480,{s:12,c:DIM});
    legend(70,160,[[COAL,'coal'],[ASH,'ash mineral']]);
    const d=+p.dil;const lab=d==0?'Thick slurry: crowding holds the ash back':d<30?'Some extra water: ash moves more freely':'Dilute slurry: ash settles freely';
-   rr(600,160,320,130,8,'#fff','#d9dde3');txt('Effect of dilution',614,184,{b:1,s:13});(lab.match(/.{1,38}(\s|$)/g)||[]).forEach((l,i)=>txt(l.trim(),614,208+i*20,{s:13}));txt('Illustration, not a reported result.',614,278,{s:12,c:DIM})}
-  else{const ax=this.ax,wl=this.wl,wy=this.wy,top=210;ctx.strokeStyle='#5b6573';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(ax+110,top);ctx.lineTo(wl+30,top);ctx.lineTo(wl+30,wy+36);ctx.lineTo(ax+110,wy+36);ctx.lineTo(ax,wy-10);ctx.lineTo(ax,top);ctx.closePath();ctx.fillStyle='#f6f7f9';ctx.fill();ctx.stroke();
+   rr(600,160,320,130,8,'#1b2327','#4a5a63');txt('Effect of dilution',614,184,{b:1,s:13});(lab.match(/.{1,38}(\s|$)/g)||[]).forEach((l,i)=>txt(l.trim(),614,208+i*20,{s:13}));txt('Illustration, not a reported result.',614,278,{s:12,c:DIM})}
+  else{const ax=this.ax,wl=this.wl,wy=this.wy,top=210;ctx.strokeStyle='#8fa2ab';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(ax+110,top);ctx.lineTo(wl+30,top);ctx.lineTo(wl+30,wy+36);ctx.lineTo(ax+110,wy+36);ctx.lineTo(ax,wy-10);ctx.lineTo(ax,top);ctx.closePath();ctx.fillStyle='#2d3b43';ctx.fill();ctx.stroke();
    ctx.fillStyle=WATER;ctx.fillRect(ax+4,top+60,wl-ax+22,wy-top-18);
-   ctx.strokeStyle='#4b5563';ctx.lineWidth=3;ctx.beginPath();const o=(this.t*60)%22;for(let x=wl;x>ax+14;x-=22){ctx.moveTo(x-o+20,wy+30);ctx.lineTo(x-o+10,wy+8)}ctx.stroke();
+   ctx.strokeStyle='#8fa2ab';ctx.lineWidth=3;ctx.beginPath();const o=(this.t*60)%22;for(let x=wl;x>ax+14;x-=22){ctx.moveTo(x-o+20,wy+30);ctx.lineTo(x-o+10,wy+8)}ctx.stroke();
    for(const q of this.ps)dot(q.x,q.y,1.6+q.d*3,q.ash?ASH:COAL);
-   ctx.strokeStyle='#4b5563';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(470,185);ctx.lineTo(470,300);ctx.lineTo(520,300);ctx.stroke();txt('feed tube',410,180,{s:12,c:DIM});
+   ctx.strokeStyle='#8fa2ab';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(470,185);ctx.lineTo(470,300);ctx.lineTo(520,300);ctx.stroke();txt('feed tube',410,180,{s:12,c:DIM});
    arrow(ax-10,wy+10,ax-70,wy+40,DIM);txt('SOLIDS OUT (cake)',ax-120,wy+60,{b:1,s:13});arrow(wl+30,top+80,wl+90,top+50,DIM);txt('LIQUID OUT (weir)',wl+34,top+28,{b:1,s:13});
    txt('Decanter centrifuge (half section; bowl spins, screw turns slightly slower)',ax,130,{b:1,s:15});txt('screw pushes the cake to the narrow end',ax+110,wy+76,{s:12,c:DIM});
    const T=this.cap+this.lost;txt('Solids captured in the cake: '+(T?Math.round(100*this.cap/T):0)+'% of particles',640,360,{s:14,b:1});txt('(more speed, more captured; mainly a dewatering machine)',640,380,{s:12,c:DIM});legend(70,200,[[COAL,'coal'],[ASH,'ash mineral']])}}};
@@ -212,28 +269,40 @@ const S7={name:'Liberation by grinding',
  see:'<p>Each square is one piece after grinding. The speckle is ash mineral locked inside the coal. Large pieces are mostly locked: coal and ash still stuck together, so no separator can split them. As pieces get smaller, more become either clean coal or free ash, and separation becomes possible.</p>',
  tail:'<p>The thesis release analysis (Fig. 1.2) found efficient separation of the high-ash flotation tailings only at -75 micrometres. Direct separation without regrinding gave only 29.5-32.1% yield of 16-18% ash coal. Because the feed is already a slurry, wet grinding is the suitable way to liberate the minerals. The grain texture drawn here is made up for teaching, it is not the thesis sample.</p>',
  src:'Sriramoju (2022), IIT Hyderabad PhD thesis, sec. 1.4.1 and Fig. 1.2 (release analysis). Texture and percentages here are illustrative.',
- init(p){this.R=mul(9);this.g=[];for(let i=0;i<120;i++)this.g.push({x:this.R(),y:this.R(),r:5+this.R()*this.R()*20});this.t=0;this.auto=false;this.cache={}},
+ init(p){this.R=mul(9);this.g=[];for(let i=0;i<110;i++)this.g.push({x:this.R(),y:this.R(),r:i<14?16+this.R()*26:3+this.R()*8});this.t=0;this.auto=false;this.cache={}},
  step(dt){if(this.auto){this.p.sz=Math.max(30,(+this.p.sz)-30*dt);const e=document.getElementById('c_sz');if(e)e.value=this.p.sz;const v=document.getElementById('v_sz');if(v)v.textContent=Math.round(this.p.sz);if(this.p.sz<=30)this.auto=false}},
  cover(x0,y0,s){const g=this.g;let c=0;for(let i=0;i<6;i++)for(let j=0;j<6;j++){const px=x0+(i+.5)/6*s,py=y0+(j+.5)/6*s;for(const k of g){const dx=px-k.x*420,dy=py-k.y*420;if(dx*dx+dy*dy<k.r*k.r){c++;break}}}return c/36},
  draw(){const S=420,X=90,Y=70,s=Math.max(30,+this.p.sz);ctx.fillStyle='#3a3a44';ctx.fillRect(X,Y,S,S);for(const k of this.g)dot(X+k.x*S,Y+k.y*S,k.r,ASH);
-  let lib=0,clean=0,lock=0,n=0;for(let x=0;x+s<=S+.1;x+=s)for(let y=0;y+s<=S+.1;y+=s){const key=Math.round(s)+'_'+x+'_'+y;let c=this.cache[key];if(c===undefined)c=this.cache[key]=this.cover(x,y,s);n++;let fill;if(c>=.75){lib++;fill='rgba(255,215,120,.30)'}else if(c<=.1){clean++;fill='rgba(0,0,0,0)'}else{lock++;fill='rgba(255,50,50,.28)'}ctx.fillStyle=fill;ctx.fillRect(X+x,Y+y,s,s);ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1;ctx.strokeRect(X+x+.5,Y+y+.5,s-1,s-1)}
+  let lib=0,clean=0,lock=0,n=0;for(let x=0;x+s<=S+.1;x+=s)for(let y=0;y+s<=S+.1;y+=s){const key=Math.round(s)+'_'+x+'_'+y;let c=this.cache[key];if(c===undefined)c=this.cache[key]=this.cover(x,y,s);n++;let fill;if(c>=.6){lib++;fill='rgba(255,215,120,.30)'}else if(c<=.03){clean++;fill='rgba(0,0,0,0)'}else{lock++;fill='rgba(255,50,50,.28)'}ctx.fillStyle=fill;ctx.fillRect(X+x,Y+y,s,s);ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1;ctx.strokeRect(X+x+.5,Y+y+.5,s-1,s-1)}
   txt('One coal particle cut into pieces of '+Math.round(s)+' micrometres (illustrative scale)',X,Y-22,{b:1,s:15});
   const bx=620,by=130,bw=280;txt('Pieces after grinding',bx,by-16,{b:1,s:14});
-  [['Clean coal pieces',clean,'#1c1c22'],['Free ash pieces',lib,ASH],['Locked (coal + ash stuck)',lock,'#d9534f']].forEach((r,i)=>{const y=by+i*56;txt(r[0]+': '+Math.round(100*r[1]/n)+'%',bx,y+14,{s:14});rr(bx,y+22,bw,14,4,'#eee');rr(bx,y+22,Math.max(.1,bw*r[1]/n),14,4,r[2])});
+  [['Clean coal pieces',clean,'#1c1c22'],['Free ash pieces',lib,ASH],['Locked (coal + ash stuck)',lock,'#d9534f']].forEach((r,i)=>{const y=by+i*56;txt(r[0]+': '+Math.round(100*r[1]/n)+'%',bx,y+14,{s:14});rr(bx,y+22,bw,14,4,'#2b3438');rr(bx,y+22,Math.max(.1,bw*r[1]/n),14,4,r[2])});
   txt('Only clean and free pieces can be separated.',bx,by+190,{s:13,b:1});txt('Reference marks from the thesis:',bx,by+226,{s:13,c:DIM});txt('-75 micrometres: efficient separation (Fig. 1.2)',bx,by+246,{s:13});txt('direct, no regrinding: 29.5-32.1% yield (1.4.1)',bx,by+266,{s:13});txt('Locked pieces are shown in red.',bx,by+300,{s:12,c:DIM})}};
 </script>
-<script>const SIMS=[S1,S2,S3,S4,S5,S6,S7];let cur=null,last=0;
-function build(i){cur=SIMS[i];cur.p={};const c=document.getElementById('ctl');c.innerHTML='';
- for(const k of cur.ctl){if(k.type=='btn'){const b=document.createElement('button');b.textContent=k.l;b.onclick=()=>{if(cur===S7){S7.init(cur.p);cur.p.sz=240;document.getElementById('c_sz').value=240;S7.auto=true}else{cur.init(cur.p)}};c.appendChild(b);continue}
-  const l=document.createElement('label');
-  if(k.type=='sel'){l.innerHTML='<span>'+k.l+'</span>';const s=document.createElement('select');s.id='c_'+k.id;for(const o of k.opts){const op=document.createElement('option');op.value=o[0];op.textContent=o[1];s.appendChild(op)}s.onchange=()=>{cur.p[k.id]=s.value};cur.p[k.id]=k.v;l.appendChild(s)}
-  else{cur.p[k.id]=k.v;l.innerHTML='<span>'+k.l+': <b id="v_'+k.id+'">'+k.v+'</b></span><input type="range" id="c_'+k.id+'" min="'+k.min+'" max="'+k.max+'" step="'+k.st+'" value="'+k.v+'">';const inp=l.querySelector('input');inp.oninput=()=>{cur.p[k.id]=+inp.value;document.getElementById('v_'+k.id).textContent=inp.value;if(k.id=='sol'||(cur===S6&&k.id=='dil'))cur.init(cur.p);if(cur===S7)S7.auto=false}}
-  c.appendChild(l)}
- cur.init(cur.p);document.getElementById('see').innerHTML=cur.see;document.getElementById('tail').innerHTML=cur.tail;document.getElementById('src').innerHTML='Sources: '+cur.src;
- document.querySelectorAll('.tabs button').forEach((b,j)=>b.classList.toggle('on',j==i))}
-function frame(ms){const dt=Math.min(.05,(ms-last)/1000||0);last=ms;if(!window.__hold)cur.step(dt);ctx.clearRect(0,0,W,H);cur.draw();requestAnimationFrame(frame)}
-const tb=document.getElementById('tabs');SIMS.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s.name;b.onclick=()=>build(i);tb.appendChild(b)});
-window.__build=build;window.__set=(id,v)=>{cur.p[id]=v};window.__step=(n,dt)=>{for(let i=0;i<n;i++)cur.step(dt)};window.__draw=()=>{ctx.clearRect(0,0,W,H);cur.draw()};
+<script>const SIMS=[S1,S2,S3,S4,S5,S6,S7],KEYS=['S1','S2','S3','S4','S5','S6','S7'];let cur=null,curKey='S1',last=0;
+const $=id=>document.getElementById(id);
+function fmt(k,v){v=+v;return (k=='rho'||k=='P'||k=='air'||k=='dose'||k=='hz')?v.toFixed(2):Math.round(v)}
+function build(i){cur=SIMS[i];curKey=KEYS[i];cur.p={};const R=REG[curKey];const c=$('ctl');c.innerHTML='';
+ for(const k of cur.ctl){if(k.type=='btn'){const b=document.createElement('button');b.className='go';b.textContent=k.l;b.onclick=()=>{if(cur===S7){S7.init(cur.p);cur.p.sz=240;$('c_sz').value=240;S7.auto=true}else{cur.init(cur.p)}};c.appendChild(b);continue}
+  if(k.type=='sel'){const l=document.createElement('label');l.innerHTML='<span>'+k.l+'</span>';const s=document.createElement('select');s.id='c_'+k.id;for(const o of k.opts){const op=document.createElement('option');op.value=o[0];op.textContent=o[1];s.appendChild(op)}s.onchange=()=>{cur.p[k.id]=s.value};cur.p[k.id]=k.v;l.appendChild(s);c.appendChild(l);continue}
+  cur.p[k.id]=k.v;const main=k.id==R.main;
+  const l=document.createElement('label');if(main)l.className='mainctl';
+  l.innerHTML='<span>'+k.l+': <b id="v_'+k.id+'">'+fmt(k.id,k.v)+'</b></span><input type="range" id="c_'+k.id+'" min="'+k.min+'" max="'+k.max+'" step="'+k.st+'" value="'+k.v+'">'+(main?'<div class="scale"><span>'+R.scale[0]+'</span><span>'+R.scale[1]+'</span><span>'+R.scale[2]+'</span></div>':'');
+  const inp=l.querySelector('input');inp.oninput=()=>{cur.p[k.id]=+inp.value;$('v_'+k.id).textContent=fmt(k.id,inp.value);if(cur===S6&&k.id=='dil')cur.init(cur.p);sweepOn=false;syncBtn();if(cur===S7)S7.auto=false};
+  if(main)c.insertBefore(l,c.firstChild);else c.appendChild(l)}
+ if(cur===S1)cur.init(cur.p);else cur.init(cur.p);sweepOn=true;ph=0;syncBtn();$('see').innerHTML=cur.see;$('tail').innerHTML=cur.tail;$('src').innerHTML='Source: '+cur.src;
+ const lg=$('legend');lg.innerHTML='';R.it.forEach((r,j)=>{const d=document.createElement('div');d.id='lg'+j;d.innerHTML='<b>'+r.k+'</b>'+r.s;lg.appendChild(d)});
+ document.querySelectorAll('.tabs button').forEach((b,j)=>b.classList.toggle('on',j==i));lastReg=-1}
+let lastReg=-1;
+let sweepOn=true,ph=0;
+function syncBtn(){const b=$('sw');if(b)b.textContent=sweepOn?'Pause sweep':'Sweep all regimes'}
+function sweep(dt){if(!sweepOn)return;const R=REG[curKey],k=cur.ctl.find(c=>c.id==R.main);ph+=dt/22;const f=ph%2,u=f<1?f:2-f,e=u*u*(3-2*u);const v=k.min+(k.max-k.min)*(R.rev?1-e:e);cur.p[k.id]=v;const inp=$('c_'+k.id);inp.value=v;$('v_'+k.id).textContent=fmt(k.id,v);if(cur===S7)S7.auto=false}
+function upd(){const R=REG[curKey],v=cur.p[R.main],r=regFor(curKey,v),j=R.it.indexOf(r);if(j!=lastReg){lastReg=j;const bd=$('badge');bd.textContent=r.k;bd.style.background=r.c;$('desc').textContent=r.t;R.it.forEach((x,n)=>$('lg'+n).classList.toggle('active',n==j))}}
+function frame(ms){const dt=Math.min(.05,(ms-last)/1000||0);last=ms;if(!window.__hold)sweep(dt);cur.step(dt);ctx.clearRect(0,0,W,H);cur.draw();upd();requestAnimationFrame(frame)}
+const names=['Settling column','Heavy medium','Jig','Hydrocyclone','Flotation','Centrifuge','Liberation'];
+const tb=$('tabs');SIMS.forEach((s,i)=>{const b=document.createElement('button');b.textContent=names[i];b.onclick=()=>build(i);tb.appendChild(b)});
+window.__build=build;window.__set=(id,v)=>{cur.p[id]=v};window.__step=(n,dt)=>{for(let i=0;i<n;i++)cur.step(dt)};window.__draw=()=>{ctx.clearRect(0,0,W,H);cur.draw();upd()};
+$('sw').onclick=()=>{sweepOn=!sweepOn;syncBtn()};
 build(+(new URLSearchParams(location.search).get('tab')||0));requestAnimationFrame(frame);
 </script>
 </body></html>
