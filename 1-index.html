@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coal separation: how each machine works (draft simulators)</title>
+<style>
+:root{--ink:#1d2430;--dim:#5b6573;--line:#d9dde3;--accent:#c4552d;--bg:#f4f2ed}
+*{box-sizing:border-box}
+body{margin:0;font-family:Bierstadt,"Segoe UI",system-ui,Arial,sans-serif;color:var(--ink);background:#fff}
+.wrap{max-width:1040px;margin:0 auto;padding:18px 16px 40px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--dim);font-size:14px;margin:0 0 14px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 12px;border-radius:8px;font-size:14px;cursor:pointer}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+canvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.ctl{display:flex;flex-wrap:wrap;gap:14px 24px;margin:12px 0;align-items:center}
+.ctl label{font-size:14px;display:flex;flex-direction:column;gap:3px;min-width:200px}
+.ctl input[type=range]{width:220px}
+.ctl button,.ctl select{padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:14px;cursor:pointer}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.cols{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff}
+.card h3{margin:0 0 6px;font-size:15px}
+.card p{font-size:14px;line-height:1.5;margin:4px 0}
+.src{font-size:12px;font-style:italic;color:var(--dim);margin-top:8px}
+.tag{display:inline-block;font-size:12px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+</style></head><body>
+<div class="wrap">
+<h1>How the coal separation machines actually work <span class="tag">DRAFT</span></h1>
+<p class="sub">Simplified 2D sketches for teaching, not DEM or CFD. Each tab shows the machine layout and the force that does the separating. Thesis numbers are shown as reported, never computed by the animation.</p>
+<div class="tabs" id="tabs"></div>
+<canvas id="cv" width="960" height="540"></canvas>
+<div class="ctl" id="ctl"></div>
+<div class="cols">
+<div class="card"><h3>What you are seeing</h3><div id="see"></div></div>
+<div class="card"><h3>For high-ash coal tailings</h3><div id="tail"></div></div>
+</div>
+<div class="src" id="src"></div>
+</div>
+<script>const W=960,H=540,cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+function mul(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const COAL='#1c1c22',ASH='#c69a5b',WATER='#dcebf5',INK='#1d2430',DIM='#5b6573',WARN='#b0431f',OK='#2f7d32';
+function txt(s,x,y,o={}){ctx.save();ctx.font=(o.b?'bold ':'')+(o.s||14)+'px Segoe UI,Arial,sans-serif';ctx.fillStyle=o.c||INK;ctx.textAlign=o.a||'left';ctx.fillText(s,x,y);ctx.restore()}
+function rr(x,y,w,h,r,f,s){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(f){ctx.fillStyle=f;ctx.fill()}if(s){ctx.strokeStyle=s;ctx.lineWidth=1.5;ctx.stroke()}}
+function dot(x,y,r,c,a=1){ctx.globalAlpha=a;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=c;ctx.fill();ctx.globalAlpha=1}
+function arrow(x1,y1,x2,y2,c=INK){ctx.save();ctx.strokeStyle=c;ctx.fillStyle=c;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();const a=Math.atan2(y2-y1,x2-x1);ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-9*Math.cos(a-.4),y2-9*Math.sin(a-.4));ctx.lineTo(x2-9*Math.cos(a+.4),y2-9*Math.sin(a+.4));ctx.fill();ctx.restore()}
+function legend(x,y,items){items.forEach((it,i)=>{dot(x+6,y+i*20-4,6,it[0]);txt(it[1],x+18,y+i*20,{s:13})})}
+function collide(P,it){for(let k=0;k<it;k++)for(let i=0;i<P.length;i++){const a=P[i];for(let j=i+1;j<P.length;j++){const b=P[j];const dx=b.x-a.x,dy=b.y-a.y,m=a.d+b.d;if(Math.abs(dx)<m&&Math.abs(dy)<m){const dd=Math.hypot(dx,dy)||.01;if(dd<m){const o=(m-dd)/2/dd;a.x-=dx*o;a.y-=dy*o;b.x+=dx*o;b.y+=dy*o}}}}}
+</script>
+<script>/* 1 Settling column */
+const S1={name:'Gravity: settling column',
+ ctl:[{id:'sol',l:'Solids in the column (% by volume)',min:2,max:40,v:8,st:1}],
+ see:'<p>A column of water with fine coal (black, light) and ash minerals (tan, dense), all starting mixed. Dense ash falls faster. As the suspension thickens, its own density rises, so coal sinks more slowly or even floats, but every particle also gets crowded and slows down.</p>',
+ tail:'<p>Plain gravity separation depends on density contrast, and fine particles settle very slowly. In a thick slurry, crowding hinders movement. Fine tailings need a stronger field than 1 g, which is what the centrifuge tab shows.</p>',
+ src:'Subba Rao &amp; Gouricharan (2016), ch. 22; Wills &amp; Finch (2015), ch. 10; Richardson &amp; Zaki (1954). Simplified: effective medium density and (1-phi)^4.65 hindrance.',
+ init(p){this.R=mul(11);const phi=p.sol/100;this.phi=phi;const n=Math.round(50+p.sol*6);this.ps=[];this.top=90;this.bot=470;this.x0=330;this.x1=630;
+  for(let i=0;i<n;i++){const ash=this.R()<.42;this.ps.push({x:this.x0+8+this.R()*(this.x1-this.x0-16),y:this.top+this.R()*(this.bot-this.top-30),ash,d:ash?3+this.R()*3.5:5+this.R()*4.5,rho:ash?2.6:1.4,rest:false})}
+  this.rs=1+phi;this.bed=new Array(50).fill(this.bot);this.tb=new Array(50).fill(this.top);this.t=0},
+ vel(d,rho){return 2.2*d*d*(rho-this.rs)*Math.pow(1-this.phi,4.65)},
+ step(dt){this.t+=dt;const bw=(this.x1-this.x0)/50;for(const q of this.ps){if(q.rest)continue;q.y+=this.vel(q.d,q.rho)*dt;q.x+=(this.R()-.5)*30*dt;q.x=Math.max(this.x0+q.d,Math.min(this.x1-q.d,q.x));
+   const b=Math.max(0,Math.min(49,((q.x-this.x0)/bw)|0));
+   if(q.y>this.bed[b]-q.d){q.y=this.bed[b]-q.d;this.bed[b]-=q.d*1.1;q.rest=true}
+   if(q.y<this.tb[b]+q.d){q.y=this.tb[b]+q.d;this.tb[b]+=q.d*1.1;q.rest=true}}},
+ draw(){rr(this.x0,this.top-10,this.x1-this.x0,this.bot-this.top+20,6,WATER,'#7fa3bd');for(const q of this.ps)dot(q.x,q.y,q.d,q.ash?ASH:COAL);
+  txt('Settling column (side view)',this.x0,60,{b:1,s:15});legend(80,200,[[COAL,'coal  (density 1.4)'],[ASH,'ash mineral (density 2.6)']]);
+  txt('Medium density: '+this.rs.toFixed(2),680,200,{b:1});txt('Solids by volume: '+(this.phi*100).toFixed(0)+'%',680,222);
+  txt('Same-size particles, relative',680,262,{s:13,c:DIM});txt('speed ash : coal',680,280,{s:13,c:DIM});
+  const ra=this.vel(6,2.6)/Math.max(1e-6,this.vel(6,1.4));txt(this.vel(6,1.4)>0?(ra.toFixed(1)+' : 1'):'coal rises',680,306,{b:1,s:20});
+  txt('(in clean water: 4.0 : 1)',680,326,{s:12,c:DIM});
+  if(this.rs>1.4)txt('Suspension denser than coal: coal floats up',680,356,{s:13,c:WARN,b:1});
+  txt('Ash fall speed cut by '+Math.round((1-Math.pow(1-this.phi,4.65))*100)+'% from crowding',680,380,{s:13,c:DIM})}};
+
+/* 2 Heavy medium */
+const S2={name:'Heavy medium separation',
+ ctl:[{id:'rho',l:'Medium relative density',min:1.3,max:1.9,v:1.5,st:.01}],
+ see:'<p>A bath of magnetite in water, set to a chosen density. Feed drops in at the left. Anything lighter than the medium floats and is skimmed off at the right as clean coal. Anything denser sinks and is scraped out along the bottom. Particles very close to the medium density hang about, which is why near-gravity material causes misplacement.</p>',
+ tail:'<p>Drift-origin Indian coals carry a lot of near-gravity material (Sriramoju 2022, sec. 1.2), and fine particles settle too slowly in a viscous medium. Heavy medium suits coarse coal, so fine tailings go to other routes.</p>',
+ src:'Subba Rao &amp; Gouricharan (2016), ch. 23; Wills &amp; Finch (2015), ch. 11; Sriramoju (2022), sec. 1.2. Particle densities in this sketch are illustrative.',
+ init(p){this.R=mul(5);this.m=+p.rho;this.ps=[];this.sp=0;this.fl=[0,0,0];this.sk=[0,0,0];this.t=0;this.L={l:140,r:830,top:150,bot:450}},
+ spawn(){const u=this.R();let rho,type;if(u<.55){rho=1.35+(this.R()+this.R()-1)*.1;type=0}else if(u<.8){rho=1.6+(this.R()+this.R()-1)*.15;type=1}else{rho=2.35+(this.R()+this.R()-1)*.3;type=2}
+  this.ps.push({x:165,y:120,rho,type,d:5+this.R()*5,vy:0})},
+ step(dt){this.t+=dt;this.m=+this.p.rho;this.sp+=dt;if(this.sp>.22){this.sp=0;this.spawn()}const L=this.L;
+  for(const q of this.ps){const df=q.rho-this.m;let vy=Math.sign(df)*Math.sqrt(Math.abs(df))*140*(q.d/8);if(Math.abs(df)<.04)vy=(this.R()-.5)*30;
+   q.vy=q.vy*.9+vy*.1;q.y+=q.vy*dt;q.x+=(df<0?62:48)*dt*((q.y>L.top+4&&q.y<L.bot-4)?.6:1)+(this.R()-.5)*8*dt;
+   if(q.y<L.top+q.d)q.y=L.top+q.d;if(q.y>L.bot-q.d)q.y=L.bot-q.d;
+   if(q.x>L.r){q.out=true;if(q.y<(L.top+L.bot)/2)this.fl[q.type]++;else this.sk[q.type]++}}
+  this.ps=this.ps.filter(q=>!q.out)},
+ draw(){const L=this.L;rr(L.l,L.top,L.r-L.l,L.bot-L.top,6,'#e6e1d8','#9b8f7c');
+  const g=ctx.createLinearGradient(0,L.top,0,L.bot);g.addColorStop(0,'rgba(120,120,130,.12)');g.addColorStop(1,'rgba(40,40,50,.28)');ctx.fillStyle=g;ctx.fillRect(L.l+1,L.top+1,L.r-L.l-2,L.bot-L.top-2);
+  for(const q of this.ps)dot(q.x,q.y,q.d,q.type==0?COAL:q.type==1?'#6b6258':ASH);
+  ctx.fillStyle='#8a8f98';ctx.fillRect(L.l,L.bot+2,L.r-L.l,6);for(let i=0;i<14;i++){const x=L.l+((i*50+this.t*30)%(L.r-L.l));dot(x,L.bot+5,2.5,'#fff')}
+  txt('Heavy medium bath (magnetite + water), relative density '+this.m.toFixed(2),L.l,L.top-34,{b:1,s:15});
+  arrow(L.l-20,110,L.l+30,135,DIM);txt('feed',L.l-48,104,{s:13,c:DIM});
+  txt('FLOAT = clean coal',L.r-150,L.top-8,{b:1,s:13});txt('SINK = shale',L.r-110,L.bot+48,{b:1,s:13});
+  const f=this.fl,s=this.sk;txt('Float so far: '+(f[0]+f[1]+f[2])+'   Sink so far: '+(s[0]+s[1]+s[2]),L.l,L.bot+28,{s:13});
+  txt('Clean coal lost to sink: '+s[0]+'   Middlings in float: '+f[1]+'   Shale in float: '+f[2],L.l,L.bot+48,{s:13,c:WARN});
+  legend(L.l+380,L.bot+28,[[COAL,'coal']]);legend(L.l+450,L.bot+28,[['#6b6258','middlings']]);legend(L.l+560,L.bot+28,[[ASH,'shale']])}};
+
+/* 3 Jig */
+const S3={name:'Jigging',
+ ctl:[{id:'amp',l:'Pulse strength',min:120,max:700,v:330,st:10},{id:'hz',l:'Pulses per second',min:.4,max:2,v:1,st:.05}],
+ see:'<p>A bed of mixed coal and shale rests on a screen while a diaphragm pulses water up through it. On the up stroke the bed opens and lighter coal is lifted more. On the down stroke the bed closes and dense shale trickles through to the bottom. After a few dozen pulses the bed is layered, coal on top, shale at the bottom.</p><p>Try a weak pulse (nothing sorts) and a violent one (everything is thrown up and mixes).</p>',
+ tail:'<p>Jigs work well for coarse and medium coal. In fine, high-ash tailings the density difference is small and the particles are tiny, so stratification is weak.</p>',
+ src:'Subba Rao &amp; Gouricharan (2016), ch. 24; Wills &amp; Finch (2015), ch. 10. Simplified: open bed on the up stroke, closed bed with trickling on the suction stroke.',
+ init(p){this.R=mul(21);this.ps=[];this.x0=290;this.x1=670;this.top=140;this.bot=410;this.t=0;
+  for(let i=0;i<150;i++){const ash=this.R()<.45;const d=ash?5+this.R()*4:6+this.R()*5;this.ps.push({x:this.x0+10+this.R()*(this.x1-this.x0-20),y:this.bot-12-this.R()*80,ash,d,rho:ash?2.4:1.4})}},
+ u(){const p=(this.t*this.p.hz)%1;return p<.35?(+this.p.amp)*Math.sin(Math.PI*p/.35):0},
+ step(dt){this.t+=dt;const u=this.u();const P=this.ps;
+  for(const q of P){const vs=26*Math.sqrt(q.d)*Math.sqrt(q.rho-1);let vy;if(u>0)vy=vs-u*.9;else vy=vs*.32*(q.ash?2.4:.6);q.y+=vy*dt;q.x+=(this.R()-.5)*20*dt}
+  collide(P,2);for(const q of P){q.x=Math.max(this.x0+q.d,Math.min(this.x1-q.d,q.x));if(q.y>this.bot-q.d)q.y=this.bot-q.d;if(q.y<this.top+q.d)q.y=this.top+q.d}},
+ draw(){const u=this.u();rr(this.x0-20,this.top-20,this.x1-this.x0+40,this.bot-this.top+80,6,'#fff','#7a8594');ctx.fillStyle=WATER;ctx.fillRect(this.x0-18,this.top-18,this.x1-this.x0+36,this.bot-this.top+18);
+  ctx.fillStyle='#8a8f98';ctx.fillRect(this.x0-18,this.bot,this.x1-this.x0+36,5);for(let x=this.x0;x<this.x1;x+=14){ctx.fillStyle='#fff';ctx.fillRect(x,this.bot,6,5)}
+  for(const q of this.ps)dot(q.x,q.y,q.d,q.ash?ASH:COAL);
+  const lift=Math.min(1,u/Math.max(1,this.p.amp))*14;rr(this.x0+140,this.bot+44-lift,this.x1-this.x0-280,10,3,'#4b5563');txt('diaphragm',this.x0+170,this.bot+78,{s:12,c:DIM});
+  if(u>0)arrow(this.x1+50,this.bot+30,this.x1+50,this.bot-40,'#2b6cb0');txt(u>0?'water pushed up: bed opens':'suction: bed closes, shale trickles down',this.x0-20,this.top-36,{b:1,s:14});
+  const A=this.ps.filter(q=>q.ash),C=this.ps.filter(q=>!q.ash);const sep=A.reduce((s,q)=>s+q.y,0)/A.length-C.reduce((s,q)=>s+q.y,0)/C.length;
+  txt('Layering: coal sits '+Math.round(sep)+' px above shale on average',this.x0-20,this.bot+104,{s:13,b:1,c:sep>35?OK:WARN});
+  legend(80,200,[[COAL,'coal (density 1.4)'],[ASH,'shale (density 2.4)']]);txt('screen',this.x1+30,this.bot+14,{s:12,c:DIM})}};
+
+/* 4 Hydrocyclone */
+const S4={name:'Hydrocyclone',
+ ctl:[{id:'P',l:'Inlet pressure (spin strength)',min:.5,max:2,v:1,st:.05}],
+ see:'<p>Slurry is pumped in sideways and spins. Heavy, coarse particles are thrown to the wall and spiral down to the narrow spigot (underflow). Light, fine particles stay near the axis, get carried up the inner vortex and leave through the top (overflow).</p><p>Turn the pressure up: stronger spin throws more of the fine ash outward, so the cut moves finer.</p>',
+ tail:'<p>A hydrocyclone sorts by size and density together, so it is a classifier more than a cleaner. For fine coal tailings it is useful for desliming and for thickening ahead of flotation or a centrifuge. Fine ash can still leave with the overflow.</p>',
+ src:'Subba Rao &amp; Gouricharan (2016), ch. 26; Wills & Finch (2015), ch. 10-11. Simplified spiral-flow model, speeds not to scale.',
+ init(p){this.R=mul(33);this.ps=[];this.sp=0;this.ov=[0,0];this.un=[0,0];this.cx=480;this.yt=100;this.yb=450;this.Rc=105;this.L=350;this.t=0},
+ Rz(z){return z<.32?this.Rc:this.Rc*(1-(z-.32)/.68*.86)},
+ step(dt){this.t+=dt;this.sp+=dt;if(this.sp>.12){this.sp=0;const ash=this.R()<.45;this.ps.push({th:this.R()*6.28,r:.92,z:.04,ash,d:.3+this.R()*.7,rho:ash?2.6:1.4})}const P=+this.p.P;
+  for(const q of this.ps){const sw=P*(1.6+1.2/Math.max(.25,q.r));q.th+=sw*dt*2.4;
+   const dr=-0.35*(q.r>.4?1:.4)+0.05*sw*sw*q.d*q.d*(q.rho-1)*q.r*0.9;q.r=Math.max(.02,Math.min(.97,q.r+dr*dt));
+   if(q.r>.42)q.z+=.20*dt*(1+.2*P);else q.z-=.42*dt*(1+.2*P);
+   if(q.z<.02&&q.r<.32)q.out='o';else if(q.z<.02)q.z=.02;if(q.z>1)q.out='u'}
+  for(const q of this.ps)if(q.out){(q.out=='o'?this.ov:this.un)[q.ash?1:0]++}this.ps=this.ps.filter(q=>!q.out)},
+ draw(){const cx=this.cx,yt=this.yt,yb=this.yb,Rc=this.Rc;ctx.strokeStyle='#5b6573';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(cx-Rc,yt);ctx.lineTo(cx-Rc,yt+.32*this.L);ctx.lineTo(cx-14,yb);ctx.lineTo(cx+14,yb);ctx.lineTo(cx+Rc,yt+.32*this.L);ctx.lineTo(cx+Rc,yt);ctx.closePath();ctx.fillStyle=WATER;ctx.fill();ctx.stroke();
+  rr(cx-28,yt-50,56,110,4,'#eef3f6','#5b6573');arrow(cx-Rc-80,yt+14,cx-Rc-4,yt+14,DIM);txt('feed enters sideways',cx-Rc-215,yt+8,{s:13,c:DIM});
+  const pts=this.ps.map(q=>{const R=this.Rz(q.z);return{x:cx+q.r*R*Math.sin(q.th),y:yt+q.z*this.L,dep:Math.cos(q.th),q}}).sort((a,b)=>a.dep-b.dep);
+  for(const o of pts)dot(o.x,o.y,2+o.q.d*3.6,o.q.ash?ASH:COAL,o.dep>0?.35:1);
+  arrow(cx,yt-62,cx,yt-96,DIM);txt('OVERFLOW: fine, light',cx+10,yt-78,{b:1,s:13});arrow(cx,yb+4,cx,yb+36,DIM);txt('UNDERFLOW: coarse, dense',cx+14,yb+30,{b:1,s:13});
+  const o=this.ov,u=this.un,to=o[0]+o[1],tu=u[0]+u[1];
+  txt('Overflow: '+to+' particles, '+(to?Math.round(100*o[1]/to):0)+'% ash',700,200,{s:14});txt('Underflow: '+tu+' particles, '+(tu?Math.round(100*u[1]/tu):0)+'% ash',700,224,{s:14});
+  txt('(particle counts, not mass)',700,244,{s:12,c:DIM});legend(80,200,[[COAL,'coal'],[ASH,'ash mineral']]);txt('Small dots = fine, big dots = coarse',80,250,{s:12,c:DIM});txt('Dimmed = far side of the cyclone',80,268,{s:12,c:DIM})}};
+</script>
+<script>/* 5 Flotation */
+const S5={name:'Froth flotation',
+ ctl:[{id:'dose',l:'Collector dose (makes coal water-repelling)',min:.1,max:1,v:.7,st:.05},{id:'size',l:'Particle size (micrometres)',min:20,max:150,v:100,st:5},{id:'air',l:'Air rate',min:.3,max:1,v:.7,st:.05}],
+ see:'<p>An impeller keeps the slurry mixed and shears air into bubbles. Coal repels water, so coal particles stick to the bubbles and are carried up into the froth and skimmed off. Ash minerals love water, so they mostly stay in the slurry. A little ash is dragged up in the water between bubbles (entrainment).</p><p>Drop the particle size below about 45 micrometres: coal sticks less well and more ash gets dragged along.</p>',
+ tail:'<p>Flotation is the standard route for fine coal. The thesis notes that ultrafine coal adsorbs reagent and floats poorly. Table 1.2 of the thesis lists flotation and column flotation of fine rejects at roughly 15-50% yield and 12-22% product ash. Those are ranges from different studies, not one result.</p>',
+ src:'Subba Rao &amp; Gouricharan (2016), ch. 27; Wills &amp; Finch (2015), ch. 12; Sriramoju (2022), sec. 1.2 and Table 1.2 (reagent adsorption on ultrafines). Attachment odds and entrainment here are illustrative.',
+ init(p){this.R=mul(44);this.ps=[];this.bs=[];this.cx0=250;this.cx1=650;this.yw=170;this.yb=470;this.cn=[0,0];this.t=0;for(let i=0;i<60;i++)this.addp(true)},
+ addp(init){const ash=this.R()<.45;this.ps.push({x:this.cx0+10+this.R()*(this.cx1-this.cx0-20),y:init?this.yw+30+this.R()*(this.yb-this.yw-60):this.yw+40,ash,b:null})},
+ step(dt){this.t+=dt;const air=+this.p.air,dose=+this.p.dose,sz=+this.p.size;const att=dose*Math.min(1,sz/60)*1.0;const ent=.008+.30*Math.max(0,(60-sz)/60);
+  if(this.R()<air*32*dt&&this.bs.filter(b=>!b.fr).length<40)this.bs.push({x:450+(this.R()-.5)*110,y:this.yb-18,r:6+this.R()*5,load:0,fr:false,ph:this.R()*6});
+  for(const b of this.bs){if(!b.fr){b.y-=(60+30*air)*dt;b.x+=Math.sin(this.t*3+b.ph)*10*dt;if(b.y<this.yw){b.fr=true;b.y=this.yw-b.r*.4-this.R()*14}}else{b.x+=40*dt}}
+  for(const q of this.ps){if(q.b){q.x=q.b.x+q.dx;q.y=q.b.y+q.dy;if(q.b.fr&&this.R()<.25*dt){q.b.load--;q.b=null;q.y=this.yw+10}continue}
+   const rx=q.x-450;q.x+=(-rx*.06+(this.R()-.5)*70)*dt;q.y+=((this.R()-.5)*70+(Math.abs(rx)<100?-14:(q.ash?10:5)))*dt;
+   q.x=Math.max(this.cx0+5,Math.min(this.cx1-5,q.x));q.y=Math.max(this.yw+8,Math.min(this.yb-8,q.y));
+   for(const b of this.bs){if(b.fr||b.load>=3)continue;const dx=b.x-q.x,dy=b.y-q.y;if(dx*dx+dy*dy<(b.r+5)*(b.r+5)){if(this.R()<(q.ash?ent:att)*dt*10){q.b=b;q.dx=(this.R()-.5)*b.r;q.dy=b.r*.6;b.load++;break}}}}
+  for(const b of this.bs)if(b.x>this.cx1+60)b.dead=true;
+  for(const q of this.ps)if(q.b&&q.b.dead){this.cn[q.ash?1:0]++;q.gone=true}
+  this.ps=this.ps.filter(q=>!q.gone);this.bs=this.bs.filter(b=>!b.dead);while(this.ps.length<60)this.addp(false)},
+ draw(){rr(this.cx0,this.yw,this.cx1-this.cx0,this.yb-this.yw,4,WATER,'#7fa3bd');ctx.fillStyle='#eef3f6';ctx.fillRect(this.cx0,this.yw-34,this.cx1-this.cx0,34);ctx.strokeStyle='#7fa3bd';ctx.strokeRect(this.cx0,this.yw-34,this.cx1-this.cx0,34);rr(this.cx1,this.yw-50,70,50,3,'#eef3f6','#7fa3bd');txt('launder',this.cx1+6,this.yw-54,{s:12,c:DIM});
+  for(const q of this.ps)if(!q.b)dot(q.x,q.y,q.ash?3.6:3.8,q.ash?ASH:COAL);
+  for(const b of this.bs){ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.strokeStyle='rgba(60,100,150,.9)';ctx.lineWidth=1.5;ctx.fillStyle='rgba(255,255,255,.55)';ctx.fill();ctx.stroke()}
+  for(const q of this.ps)if(q.b)dot(q.x,q.y,q.ash?3.6:3.8,q.ash?ASH:COAL);
+  ctx.fillStyle='#4b5563';ctx.fillRect(445,this.yw-60,10,this.yb-this.yw-20+60);ctx.save();ctx.translate(450,this.yb-18);ctx.rotate(this.t*8);ctx.fillRect(-34,-4,68,8);ctx.rotate(Math.PI/2);ctx.fillRect(-34,-4,68,8);ctx.restore();
+  txt('Flotation cell (side view)',this.cx0,this.yw-72,{b:1,s:15});txt('froth',this.cx0+6,this.yw-14,{s:12,c:DIM});txt('impeller',470,this.yb+16,{s:12,c:DIM});
+  const c=this.cn,t=c[0]+c[1];txt('Concentrate so far: '+t+' particles, '+(t?Math.round(100*c[1]/t):0)+'% ash',690,250,{s:14,b:1});txt('(counts, not mass; illustrative)',690,270,{s:12,c:DIM});
+  if(+this.p.size<45)txt('Ultrafine: weak attachment, more entrainment',690,300,{s:13,c:WARN,b:1});
+  legend(70,200,[[COAL,'coal (water-repelling)'],[ASH,'ash mineral (water-loving)']]);arrow(520,this.yw+60,520,this.yw-10,'#2b6cb0');txt('bubble + coal rises',530,this.yw+50,{s:12,c:'#2b6cb0'})}};
+
+/* 6 Centrifuge */
+const S6={name:'Centrifugal (tube and decanter)',
+ ctl:[{id:'mode',l:'Machine',type:'sel',opts:[['tube','Lab tube centrifuge'],['dec','Decanter centrifuge (industrial)']],v:'tube'},{id:'rpm',l:'Speed, rpm (tube) / bowl speed (decanter)',min:1000,max:14000,v:10000,st:500},{id:'dil',l:'Extra water added, % (tube only)',min:0,max:70,v:50,st:10},{id:'go',type:'btn',l:'Restart run'}],
+ see:'<p><b>Tube:</b> a lab test-tube centrifuge on fine slurry, spun for a few minutes. Dense ash is thrown to the bottom first, coal settles slowly into a band above it, clear water sits on top. Too fast or too long and the coal reaches the bottom too, so the layers merge. Too thick and the crowd holds the ash back.</p><p><b>Decanter:</b> a continuous machine. Solids are thrown to the wall of a spinning bowl and a slightly slower screw pushes them out of the narrow end while liquid leaves over a weir at the other end.</p>',
+ tail:'<p>Sriramoju (2022), sec. 1.4.1 names density-gradient centrifugation as one of the ways tried to recover coal from ultrafine slurry, alongside froth flotation and gravity sedimentation. The thesis results for it are in later chapters and are not covered here.</p><p>Caveat: this tube is a batch lab test. A decanter works continuously and is mainly a dewatering machine.</p>',
+ src:'Sriramoju (2022), IIT Hyderabad PhD thesis, sec. 1.4.1; Subba Rao &amp; Gouricharan (2016), ch. 30.3.6. Particle motion here is a simplified settling model.',
+ init(p){this.R=mul(77);this.t=0;this.mode=p.mode;this.ps=[];
+  if(p.mode=='tube'){const dil=p.dil/100;const n=Math.round(230/(1+dil*1.1));this.x0=430;this.x1=530;this.top=90;this.bot=470;
+   for(let i=0;i<n;i++){const ash=this.R()<.45;this.ps.push({x:this.x0+6+this.R()*(this.x1-this.x0-12),y:this.top+6+this.R()*(this.bot-this.top-12),ash,d:2.2+this.R()*2.2,rho:ash?2.6:1.4})}}
+  else{this.sp=0;this.cap=0;this.lost=0;this.ax=250;this.wl=720;this.wy=420}},
+ step(dt){this.t+=dt;const p=this.p;if(p.mode!=this.mode){this.init(p)}
+  if(this.mode=='tube'){const sim=dt*16;const rpm=+p.rpm/1000;if(this.t*16>180)return;const P=this.ps;
+   for(const q of P){let nb=0;for(const o of P){if(o!==q&&Math.abs(o.x-q.x)<14&&Math.abs(o.y-q.y)<14)nb++}const phi=Math.min(.55,nb*9/196*1.3);
+    q.y+=.0045*rpm*rpm*q.d*q.d*(q.rho-1)*Math.pow(1-phi,4.65)*sim;q.x+=(this.R()-.5)*8*sim}
+   collide(P,2);for(const q of P){q.x=Math.max(this.x0+q.d,Math.min(this.x1-q.d,q.x));if(q.y>this.bot-q.d)q.y=this.bot-q.d}}
+  else{const G=+p.rpm/1000;this.sp+=dt;if(this.sp>.08){this.sp=0;this.ps.push({x:470+this.R()*30,y:300,ash:this.R()<.5,d:.3+this.R()*.7,st:0})}
+   for(const q of this.ps){if(q.st==0){q.x+=44*dt;q.y+=2.7*G*G*q.d*q.d*(q.ash?1.8:.6)*dt;if(q.y>=this.wy+28){q.y=this.wy+28;q.st=1}else if(q.x>this.wl)q.out='lost'}else{q.x-=60*dt;if(q.x<this.ax+10)q.out='cap'}}
+   for(const q of this.ps){if(q.out=='cap')this.cap++;else if(q.out=='lost')this.lost++}this.ps=this.ps.filter(q=>!q.out)}},
+ draw(){const p=this.p;
+  if(this.mode=='tube'){const x0=this.x0,x1=this.x1,t0=this.top,b=this.bot;rr(x0-6,t0-6,x1-x0+12,b-t0+12,14,'#fff','#7a8594');ctx.fillStyle=WATER;ctx.fillRect(x0,t0,x1-x0,b-t0-6);
+   for(const q of this.ps)dot(q.x,q.y,q.d,q.ash?ASH:COAL);
+   const clock=Math.min(180,this.t*16);txt('Lab tube centrifuge',x0-230,70,{b:1,s:15});txt('centrifugal force acts downwards',x0+110,330,{s:13,c:DIM});arrow(x0+150,340,x0+150,390,DIM);
+   txt('Spin time '+Math.floor(clock/60)+':'+String(Math.floor(clock%60)).padStart(2,'0')+' (shown 16x faster)',x0+110,100,{s:13});txt('Speed '+p.rpm+' rpm, extra water '+p.dil+'%',x0+110,120,{s:13});
+   const ash=this.ps.filter(q=>q.ash),coal=this.ps.filter(q=>!q.ash);const my=a=>a.reduce((s,q)=>s+q.y,0)/a.length;const gap=my(ash)-my(coal);
+   txt('Ash sits on average '+Math.round(gap)+' px below coal',x0+110,150,{s:13,b:1,c:gap>90?OK:WARN});
+   ctx.save();ctx.translate(200,400);ctx.rotate(this.t*(+p.rpm/1000)*1.4);ctx.strokeStyle='#4b5563';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-60,0);ctx.lineTo(60,0);ctx.stroke();rr(-72,-9,22,18,3,'#9aa6b2');rr(50,-9,22,18,3,'#9aa6b2');ctx.restore();txt('rotor (top view)',150,480,{s:12,c:DIM});
+   legend(70,160,[[COAL,'coal'],[ASH,'ash mineral']]);
+   const d=+p.dil;const lab=d==0?'Thick slurry: crowding holds the ash back':d<30?'Some extra water: ash moves more freely':'Dilute slurry: ash settles freely';
+   rr(600,160,320,130,8,'#fff','#d9dde3');txt('Effect of dilution',614,184,{b:1,s:13});(lab.match(/.{1,38}(\s|$)/g)||[]).forEach((l,i)=>txt(l.trim(),614,208+i*20,{s:13}));txt('Illustration, not a reported result.',614,278,{s:12,c:DIM})}
+  else{const ax=this.ax,wl=this.wl,wy=this.wy,top=210;ctx.strokeStyle='#5b6573';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(ax+110,top);ctx.lineTo(wl+30,top);ctx.lineTo(wl+30,wy+36);ctx.lineTo(ax+110,wy+36);ctx.lineTo(ax,wy-10);ctx.lineTo(ax,top);ctx.closePath();ctx.fillStyle='#f6f7f9';ctx.fill();ctx.stroke();
+   ctx.fillStyle=WATER;ctx.fillRect(ax+4,top+60,wl-ax+22,wy-top-18);
+   ctx.strokeStyle='#4b5563';ctx.lineWidth=3;ctx.beginPath();const o=(this.t*60)%22;for(let x=wl;x>ax+14;x-=22){ctx.moveTo(x-o+20,wy+30);ctx.lineTo(x-o+10,wy+8)}ctx.stroke();
+   for(const q of this.ps)dot(q.x,q.y,1.6+q.d*3,q.ash?ASH:COAL);
+   ctx.strokeStyle='#4b5563';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(470,185);ctx.lineTo(470,300);ctx.lineTo(520,300);ctx.stroke();txt('feed tube',410,180,{s:12,c:DIM});
+   arrow(ax-10,wy+10,ax-70,wy+40,DIM);txt('SOLIDS OUT (cake)',ax-120,wy+60,{b:1,s:13});arrow(wl+30,top+80,wl+90,top+50,DIM);txt('LIQUID OUT (weir)',wl+34,top+28,{b:1,s:13});
+   txt('Decanter centrifuge (half section; bowl spins, screw turns slightly slower)',ax,130,{b:1,s:15});txt('screw pushes the cake to the narrow end',ax+110,wy+76,{s:12,c:DIM});
+   const T=this.cap+this.lost;txt('Solids captured in the cake: '+(T?Math.round(100*this.cap/T):0)+'% of particles',640,360,{s:14,b:1});txt('(more speed, more captured; mainly a dewatering machine)',640,380,{s:12,c:DIM});legend(70,200,[[COAL,'coal'],[ASH,'ash mineral']])}}};
+
+/* 7 Liberation */
+const S7={name:'Liberation by grinding',
+ ctl:[{id:'sz',l:'Piece size after grinding (illustrative micrometres)',min:30,max:240,v:240,st:5},{id:'go',type:'btn',l:'Grind it down'}],
+ see:'<p>Each square is one piece after grinding. The speckle is ash mineral locked inside the coal. Large pieces are mostly locked: coal and ash still stuck together, so no separator can split them. As pieces get smaller, more become either clean coal or free ash, and separation becomes possible.</p>',
+ tail:'<p>The thesis release analysis (Fig. 1.2) found efficient separation of the high-ash flotation tailings only at -75 micrometres. Direct separation without regrinding gave only 29.5-32.1% yield of 16-18% ash coal. Because the feed is already a slurry, wet grinding is the suitable way to liberate the minerals. The grain texture drawn here is made up for teaching, it is not the thesis sample.</p>',
+ src:'Sriramoju (2022), IIT Hyderabad PhD thesis, sec. 1.4.1 and Fig. 1.2 (release analysis). Texture and percentages here are illustrative.',
+ init(p){this.R=mul(9);this.g=[];for(let i=0;i<120;i++)this.g.push({x:this.R(),y:this.R(),r:5+this.R()*this.R()*20});this.t=0;this.auto=false;this.cache={}},
+ step(dt){if(this.auto){this.p.sz=Math.max(30,(+this.p.sz)-30*dt);const e=document.getElementById('c_sz');if(e)e.value=this.p.sz;const v=document.getElementById('v_sz');if(v)v.textContent=Math.round(this.p.sz);if(this.p.sz<=30)this.auto=false}},
+ cover(x0,y0,s){const g=this.g;let c=0;for(let i=0;i<6;i++)for(let j=0;j<6;j++){const px=x0+(i+.5)/6*s,py=y0+(j+.5)/6*s;for(const k of g){const dx=px-k.x*420,dy=py-k.y*420;if(dx*dx+dy*dy<k.r*k.r){c++;break}}}return c/36},
+ draw(){const S=420,X=90,Y=70,s=Math.max(30,+this.p.sz);ctx.fillStyle='#3a3a44';ctx.fillRect(X,Y,S,S);for(const k of this.g)dot(X+k.x*S,Y+k.y*S,k.r,ASH);
+  let lib=0,clean=0,lock=0,n=0;for(let x=0;x+s<=S+.1;x+=s)for(let y=0;y+s<=S+.1;y+=s){const key=Math.round(s)+'_'+x+'_'+y;let c=this.cache[key];if(c===undefined)c=this.cache[key]=this.cover(x,y,s);n++;let fill;if(c>=.75){lib++;fill='rgba(255,215,120,.30)'}else if(c<=.1){clean++;fill='rgba(0,0,0,0)'}else{lock++;fill='rgba(255,50,50,.28)'}ctx.fillStyle=fill;ctx.fillRect(X+x,Y+y,s,s);ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1;ctx.strokeRect(X+x+.5,Y+y+.5,s-1,s-1)}
+  txt('One coal particle cut into pieces of '+Math.round(s)+' micrometres (illustrative scale)',X,Y-22,{b:1,s:15});
+  const bx=620,by=130,bw=280;txt('Pieces after grinding',bx,by-16,{b:1,s:14});
+  [['Clean coal pieces',clean,'#1c1c22'],['Free ash pieces',lib,ASH],['Locked (coal + ash stuck)',lock,'#d9534f']].forEach((r,i)=>{const y=by+i*56;txt(r[0]+': '+Math.round(100*r[1]/n)+'%',bx,y+14,{s:14});rr(bx,y+22,bw,14,4,'#eee');rr(bx,y+22,Math.max(.1,bw*r[1]/n),14,4,r[2])});
+  txt('Only clean and free pieces can be separated.',bx,by+190,{s:13,b:1});txt('Reference marks from the thesis:',bx,by+226,{s:13,c:DIM});txt('-75 micrometres: efficient separation (Fig. 1.2)',bx,by+246,{s:13});txt('direct, no regrinding: 29.5-32.1% yield (1.4.1)',bx,by+266,{s:13});txt('Locked pieces are shown in red.',bx,by+300,{s:12,c:DIM})}};
+</script>
+<script>const SIMS=[S1,S2,S3,S4,S5,S6,S7];let cur=null,last=0;
+function build(i){cur=SIMS[i];cur.p={};const c=document.getElementById('ctl');c.innerHTML='';
+ for(const k of cur.ctl){if(k.type=='btn'){const b=document.createElement('button');b.textContent=k.l;b.onclick=()=>{if(cur===S7){S7.init(cur.p);cur.p.sz=240;document.getElementById('c_sz').value=240;S7.auto=true}else{cur.init(cur.p)}};c.appendChild(b);continue}
+  const l=document.createElement('label');
+  if(k.type=='sel'){l.innerHTML='<span>'+k.l+'</span>';const s=document.createElement('select');s.id='c_'+k.id;for(const o of k.opts){const op=document.createElement('option');op.value=o[0];op.textContent=o[1];s.appendChild(op)}s.onchange=()=>{cur.p[k.id]=s.value};cur.p[k.id]=k.v;l.appendChild(s)}
+  else{cur.p[k.id]=k.v;l.innerHTML='<span>'+k.l+': <b id="v_'+k.id+'">'+k.v+'</b></span><input type="range" id="c_'+k.id+'" min="'+k.min+'" max="'+k.max+'" step="'+k.st+'" value="'+k.v+'">';const inp=l.querySelector('input');inp.oninput=()=>{cur.p[k.id]=+inp.value;document.getElementById('v_'+k.id).textContent=inp.value;if(k.id=='sol'||(cur===S6&&k.id=='dil'))cur.init(cur.p);if(cur===S7)S7.auto=false}}
+  c.appendChild(l)}
+ cur.init(cur.p);document.getElementById('see').innerHTML=cur.see;document.getElementById('tail').innerHTML=cur.tail;document.getElementById('src').innerHTML='Sources: '+cur.src;
+ document.querySelectorAll('.tabs button').forEach((b,j)=>b.classList.toggle('on',j==i))}
+function frame(ms){const dt=Math.min(.05,(ms-last)/1000||0);last=ms;if(!window.__hold)cur.step(dt);ctx.clearRect(0,0,W,H);cur.draw();requestAnimationFrame(frame)}
+const tb=document.getElementById('tabs');SIMS.forEach((s,i)=>{const b=document.createElement('button');b.textContent=s.name;b.onclick=()=>build(i);tb.appendChild(b)});
+window.__build=build;window.__set=(id,v)=>{cur.p[id]=v};window.__step=(n,dt)=>{for(let i=0;i<n;i++)cur.step(dt)};window.__draw=()=>{ctx.clearRect(0,0,W,H);cur.draw()};
+build(+(new URLSearchParams(location.search).get('tab')||0));requestAnimationFrame(frame);
+</script>
+</body></html>
